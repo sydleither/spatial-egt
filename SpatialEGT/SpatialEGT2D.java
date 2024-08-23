@@ -36,7 +36,7 @@ public class SpatialEGT2D {
         return fsList;
     }
 
-    public static Map<Integer, Integer[]> GetPairCorrelation(Model2D model, int maxDistance, int area, Map<List<Integer>, Integer> annulusAreaLookupTable) {
+    public static Map<Integer, Integer[]> GetPairCorrelation(Model2D model, int maxDistance, int area, Map<List<Integer>, Integer> annulusAreaLookupTable, int start, int length) {
         List<Cell2D> cells = new ArrayList<Cell2D>();
         for (Cell2D cell : model) {
             cells.add(cell);
@@ -62,9 +62,18 @@ public class SpatialEGT2D {
                 int yDistance = Math.abs(cellA.Ysq() - cellB.Ysq());
                 int annulus = xDistance + yDistance;
 
-                // if (!cellA.OppositeTypeInNeighborhood()) {
-                //     continue;
-                // }
+                if (cellA.Xsq() >= start+length || cellA.Xsq() <= start) {
+                    continue;
+                }
+                if (cellA.Ysq() >= start+length || cellA.Ysq() <= start) {
+                    continue;
+                }
+                if (cellB.Xsq() >= start+length || cellB.Xsq() <= start) {
+                    continue;
+                }
+                if (cellB.Ysq() >= start+length || cellB.Ysq() <= start) {
+                    continue;
+                }
 
                 if (annulus >= maxDistance) {
                     continue;
@@ -91,16 +100,16 @@ public class SpatialEGT2D {
         return annulusRow;
     }
 
-    public static Map<List<Integer>, Integer> GetAnnulusAreaLookupTable(int x, int y, int maxDistance) {
+    public static Map<List<Integer>, Integer> GetAnnulusAreaLookupTable(int start, int length, int maxDistance) {
         //TODO make more efficient (don't calculate area when radius is not near boundary, reflections)
         Map<List<Integer>, Integer> table = new HashMap<>();
         for (int r = 1; r < maxDistance; r++) {
-            for (int x1 = 0; x1 < x; x1++) {
-                for (int y1 = 0; y1 < y; y1++) {
+            for (int x1 = start; x1 < length+start; x1++) {
+                for (int y1 = start; y1 < length+start; y1++) {
                     List<Integer> tableKey = Arrays.asList(x1, y1, r);
                     int area = 0;
-                    for (int x2 = Math.max(x1-r,0); x2 <= Math.min(x1+r,x); x2++) {
-                        for (int y2 = Math.max(y1-r,0); y2 <= Math.min(y1+r,y); y2++) {
+                    for (int x2 = Math.max(x1-r,start); x2 <= Math.min(x1+r,start+length); x2++) {
+                        for (int y2 = Math.max(y1-r,start); y2 <= Math.min(y1+r,start+length); y2++) {
                             if (Math.abs(x1-x2) + Math.abs(y1-y2) == r) {
                                 area += 1;
                             }
@@ -193,8 +202,8 @@ public class SpatialEGT2D {
         }
         FileIO pcOut = null;
         if (writePc) {
-            maxDistance = x;
-            annulusAreaLookupTable = GetAnnulusAreaLookupTable(x, y, maxDistance);
+            maxDistance = 20;
+            annulusAreaLookupTable = GetAnnulusAreaLookupTable(60, 10, maxDistance);
             pcOut = new FileIO(saveLoc+"pairCorrelations.csv", "w");
             pcOut.Write("model,time,pair,measure,radius,normalized_count\n");
         }
@@ -228,7 +237,7 @@ public class SpatialEGT2D {
                 }
                 if (writePc) {
                     if (tick % writePcFrequency == 0) {
-                        Map<Integer, Integer[]> annulusRows = GetPairCorrelation(model, maxDistance, x*y, annulusAreaLookupTable);
+                        Map<Integer, Integer[]> annulusRows = GetPairCorrelation(model, maxDistance, x*y, annulusAreaLookupTable, 60, 10);
                         String pairTypes[] = {"SS", "RR", "RS", "SR"};
                         for (int dist = 1; dist < maxDistance; dist++) {
                             for (int i = 0; i < 4; i++) {
