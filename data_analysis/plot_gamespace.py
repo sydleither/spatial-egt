@@ -46,8 +46,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-dir", "--data_type", type=str, default="in_vitro_pc9")
     parser.add_argument("-hue", "--hue", type=str, default="cell_types")
-    parser.add_argument("-source", "--source", type=str, default=None)
-    parser.add_argument("-samples", "--sample_ids", type=list, default=None)
+    parser.add_argument("-src", "--source", type=str, default=None)
+    parser.add_argument("-samples", "--sample_ids", type=str, nargs="*", default=None)
     args = parser.parse_args()
 
     save_name = args.hue
@@ -63,6 +63,10 @@ def main():
     image_data_path = get_data_path(args.data_type, "images")
     df = get_samples(args.data_type, source, sample_ids)
     plot_gamespace(image_data_path, save_name, df, args.hue)
+
+    print("Payoff parameter ranges:")
+    for p in ["a", "b", "c", "d"]:
+        print("\t", p, df[p].min(), df[p].max())
 
 
 if __name__ == "__main__":

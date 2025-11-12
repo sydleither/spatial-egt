@@ -1,4 +1,4 @@
-import sys
+import argparse
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as grid_spec
@@ -14,32 +14,28 @@ def plot_funcs(save_loc, file_name, df, label, stat_name, col):
     df = df.explode(stat_name)
     df["x"] = df.groupby(["source", "sample", label]).cumcount()
     col_order = None
-    if label == "game":
+    if col == "game":
         col_order = game_colors.keys()
-        colors = game_colors.values()
     else:
         col_order = sorted(df[col].unique())
-        colors = sns.color_palette("hls", len(df[col].unique()))
     facet = sns.FacetGrid(
         df,
         col=col,
         col_order=col_order,
-        hue_order=col_order,
-        palette=colors,
         height=4,
         aspect=1,
     )
-    facet.map_dataframe(sns.lineplot, x="x", y=stat_name, errorbar="sd")
+    facet.map_dataframe(sns.lineplot, x="x", y=stat_name, color="hotpink", errorbar="sd")
     facet.set_titles(col_template="{col_name}")
     facet.tight_layout()
     facet.figure.patch.set_alpha(0.0)
-    facet.savefig(f"{save_loc}/{file_name}.png", bbox_inches="tight")
+    facet.savefig(f"{save_loc}/{file_name}_{label}.png", bbox_inches="tight")
 
 
 def plot_dists(save_loc, file_name, df, label_name, stat_name, col):
     df = df.explode(stat_name).reset_index()
     order = None
-    if label_name == "game":
+    if col == "game":
         order = game_colors.keys()
     else:
         order = sorted(df[col].unique())
@@ -58,10 +54,10 @@ def plot_dists(save_loc, file_name, df, label_name, stat_name, col):
     facet.set_titles(col_template="{col_name}")
     facet.tight_layout()
     facet.figure.patch.set_alpha(0.0)
-    facet.savefig(f"{save_loc}/{file_name}.png", bbox_inches="tight")
+    facet.savefig(f"{save_loc}/{file_name}_{label_name}.png", bbox_inches="tight")
 
 
-def plot_values(save_loc, file_name, df, label_name, stat_name, col):
+def plot_values(save_loc, file_name, df, label, stat_name, col):
     """https://matplotlib.org/matplotblog/posts/create-ridgeplots-in-matplotlib/"""
     labels = sorted(df[col].unique())
     num_labels = len(labels)
@@ -91,15 +87,15 @@ def plot_values(save_loc, file_name, df, label_name, stat_name, col):
     gs.update(hspace=-0.7)
     fig.tight_layout()
     fig.figure.patch.set_alpha(0.0)
-    plt.savefig(f"{save_loc}/{file_name}.png", bbox_inches="tight")
+    plt.savefig(f"{save_loc}/{file_name}_{label}.png", bbox_inches="tight")
 
 
-def get_data(df_stat, data_type, label_name, stat_name, source="", sample_ids=None):
+def get_data(df_stat, data_type, label_name, stat_name, source=None, sample_ids=None):
     data_path = get_data_path(data_type, ".")
     df_labels = pd.read_csv(f"{data_path}/labels.csv")
     df_labels["sample"] = df_labels["sample"].astype(str)
 
-    if source != "":
+    if source:
         df_labels = df_labels[df_labels["source"] == source]
     if sample_ids:
         df_labels = df_labels[df_labels["sample"].isin(sample_ids)]
@@ -112,23 +108,35 @@ def get_data(df_stat, data_type, label_name, stat_name, source="", sample_ids=No
 
 
 def idv_plots(df_stat, data_type, time, label_name, stat_name, source, plot, *sample_ids):
-    save_loc = get_data_path(data_type, f"images/{stat_name}", time)
+    save_loc = get_data_path(data_type, "images", time)
     df = get_data(df_stat, data_type, label_name, stat_name, source=source, sample_ids=sample_ids)
     file_name = stat_name + "_" + source + "_" + "_".join(sample_ids)
     plot(save_loc, file_name, df, label_name, stat_name, "sample")
 
 
 def agg_plot(df_stat, data_type, time, label_name, stat_name, source, plot):
-    save_loc = get_data_path(data_type, f"images/{stat_name}", time)
+    save_loc = get_data_path(data_type, "images", time)
     df = get_data(df_stat, data_type, label_name, stat_name, source=source)
-    file_name = stat_name + source
+    df = df.loc[:, ~df.columns.duplicated()]
+    file_name = stat_name
+    if source:
+        file_name += "_" + source
     plot(save_loc, file_name, df, label_name, stat_name, label_name)
 
 
-def main(data_type, time, label_name, stat_name, *filter_args):
-    features_data_path = get_data_path(data_type, "statistics")
-    df_stat = pd.read_pickle(f"{features_data_path}/{stat_name}.pkl")
-    function_type = get_spatial_statistic_type(df_stat, stat_name)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-dir", "--data_type", type=str, default="in_vitro_pc9")
+    parser.add_argument("-label", "--label", type=str, default="game")
+    parser.add_argument("-time", "--time", type=int, default=72)
+    parser.add_argument("-stat", "--statistic", type=str, default="Proportion_Sensitive")
+    parser.add_argument("-src", "--source", type=str, default=None)
+    parser.add_argument("-samples", "--sample_ids", type=str, nargs="*", default=None)
+    args = parser.parse_args()
+
+    features_data_path = get_data_path(args.data_type, "statistics", args.time)
+    df_stat = pd.read_pickle(f"{features_data_path}/{args.statistic}.pkl")
+    function_type = get_spatial_statistic_type(df_stat, args.statistic)
     if function_type == "distribution":
         plot = plot_dists
     elif function_type == "function":
@@ -136,19 +144,20 @@ def main(data_type, time, label_name, stat_name, *filter_args):
     else:
         plot = plot_values
 
-    if len(filter_args) == 0:
-        agg_plot(df_stat, data_type, time, label_name, stat_name, "", plot)
-    elif len(filter_args) == 1:
-        source = filter_args[0]
-        agg_plot(df_stat, data_type, time, label_name, stat_name, source, plot)
-    elif len(filter_args) > 1:
-        source = filter_args[0]
-        sample_ids = filter_args[1:]
-        idv_plots(df_stat, data_type, time, label_name, stat_name, source, plot, *sample_ids)
+    if args.sample_ids is None:
+        agg_plot(df_stat, args.data_type, args.time, args.label, args.statistic, args.source, plot)
+    else:
+        idv_plots(
+            df_stat,
+            args.data_type,
+            args.time,
+            args.label,
+            args.statistic,
+            args.source,
+            plot,
+            *args.sample_ids,
+        )
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 4:
-        main(*sys.argv[1:])
-    else:
-        print("Please see the module docstring for usage instructions.")
+    main()
