@@ -32,7 +32,7 @@ def write_aggregated(run_cmd, python_file, data_type, time, statistic_names):
         output.append(
             f"{run_cmd} {python_file} -dir {data_type} -stat {statistic_name} -time {time}\n"
         )
-    with open(f"run_{data_type}_{time}.sh", "w", encoding="UTF-8") as f:
+    with open(f"run_{data_type.replace('/', '_')}_{time}.sh", "w", encoding="UTF-8") as f:
         for output_line in output:
             f.write(output_line)
     get_data_path(data_type, "statistics", time)

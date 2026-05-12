@@ -44,6 +44,7 @@ def main():
     parser.add_argument("-dir", "--data_type", type=str, default="in_silico")
     parser.add_argument("-label", "--label_name", type=str, default="game")
     parser.add_argument("-time", "--time", type=int, default=72)
+    parser.add_argument("-clean", "--clean", type=int, default=1, choices=[0, 1])
     args = parser.parse_args()
 
     data_path = get_data_path(args.data_type, ".")
@@ -67,6 +68,10 @@ def main():
         df_feature["sample"] = df_feature["sample"].astype(str)
         df = pd.merge(df, df_feature, on=["source", "sample"], how="outer")
     df = df[df[args.label_name].notna()]
+    if args.clean:
+        df = df.drop(["source", "sample"], axis=1)
+        labels = df.pop("label")
+        df.insert(len(df.columns), "label", labels)
     df.to_csv(f"{statistics_data_path}/features.csv", index=False, na_rep=np.nan)
 
 
